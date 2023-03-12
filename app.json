@@ -1,0 +1,8 @@
+{
+  "name": "voice_command",
+  "displayName": "voice_command",
+  "ios": {
+    "bundleIdentifier": "your bundle identifier",
+    "supportsTablet": true
+  }
+}
