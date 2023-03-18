@@ -6,26 +6,26 @@
  */
 
 import React, { useEffect } from 'react';
-// import type {PropsWithChildren} from 'react';
 import {
   SafeAreaView,
   ScrollView,
-  StatusBar,
   StyleSheet,
   Text,
   TextInput,
+  TouchableOpacity,
   useColorScheme,
   View,
-  FlatList,
-  TouchableOpacity,
 } from 'react-native';
 
 import {
   Colors,
 } from 'react-native/Libraries/NewAppScreen';
 import Tts from 'react-native-tts';
+import { Picker } from '@react-native-picker/picker';
+import Icon from 'react-native-vector-icons/MaterialIcons';
 
-type Histroy = {
+
+type Log = {
   id: number,
   text: string
 }
@@ -33,7 +33,17 @@ type Histroy = {
 function App(): JSX.Element {
   const isDarkMode = useColorScheme() === 'dark';
   const [text, onChangeText] = React.useState('');
-  const [history, setHistory] = React.useState<Histroy[]>([]);
+  const [selected, setSelected] = React.useState('');
+  const [history, setHistory] = React.useState<Log[]>([]);
+  const [play, setPlay] = React.useState('play-arrow');
+
+  const Item = ({ onPress, name, size, style }:any) => {
+    return (
+      <TouchableOpacity onPress={onPress} style={style}>
+        <Icon name={name} size={size} color={isDarkMode ? Colors.white:Colors.black} />
+      </TouchableOpacity>
+    );
+  };
 
   const backgroundStyle = {
     backgroundColor: isDarkMode ? Colors.darker : Colors.lighter,
@@ -45,27 +55,39 @@ function App(): JSX.Element {
     Tts.getInitStatus().then(()=>{
       Tts.setDefaultLanguage('ja-JP');
       Tts.setDefaultRate(1);
-      Tts.addEventListener('tts-finish',()=>onChangeText(''));
+      Tts.addEventListener('tts-start',()=>setPlay('pause'));
+      Tts.addEventListener('tts-cancel',()=>setPlay('play-arrow'));
+      Tts.addEventListener('tts-finish',()=>{onChangeText(''); setPlay('play-arrow')});
     }).catch(err=>console.error(err))
   },[]);
-
-  const handleRemoveItem = (id:number) => {
-    setHistory(history.filter(item => item.id !== id));
-  };
   
   const handleAddItem = (data:string) => {
-    const newItem = { id: new Date().getTime(), text: data };
-    setHistory([...history, newItem]);
+    // 今日の日付を取得
+    const today = new Date();
+    const newItem = { id: today.getTime(), text: data };
+    // 一日前の日付を取得
+    const yesterday = new Date();
+    yesterday.setDate(today.getDate() - 1);
+
+    setHistory([...history.filter(item=>item.id>=yesterday.getTime()), newItem]);
   };
   
   const handleKeyPress = (event: any) => {
-    if (event.nativeEvent.key === 'Enter' && !event.nativeEvent.shiftKey) {
+    if (event.nativeEvent.key === 'Enter') {
       try {
         Tts.speak(text);
         handleAddItem(text);
       } catch (err) {
         console.error(err);
       }
+    }
+  };
+  
+  const handleTTS = () => {
+    if (play==='play-arrow'){
+      Tts.speak(selected);
+    } else {
+      Tts.stop();
     }
   };
   
@@ -76,75 +98,60 @@ function App(): JSX.Element {
       console.error(err);
     }
   };
-  const renderItem = ({item}:any) => {
-    // 一日前の日付を取得
-    const yesterday = new Date();
-    yesterday.setDate(new Date().getDate() - 1);
-    if (item.id>yesterday.getTime()){
-      return (
-      <TouchableOpacity onPress={() => handlePress(item.text)}>
-        <View style={{ padding: 10 }}>
-          <Text 
-            style={{
-              textAlign: 'center',
-              color: isDarkMode ? Colors.white:Colors.black
-            }}
-          >{item.text}</Text>
-        </View>
-      </TouchableOpacity>);
-    } else {
-      handleRemoveItem(item.id);
-      return null;
-    }
-};
   
   return (
     <SafeAreaView style={backgroundStyle}>
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
         style={backgroundStyle}>
-        <View
-          >
+        <View>
             <Text style={{
               fontSize: 30,
               textAlign: 'center',
               color: isDarkMode ? Colors.white:Colors.black
             }}>入力履歴</Text>
-            <ScrollView
-              contentInsetAdjustmentBehavior="automatic"
+            <Picker
+              selectedValue={selected}
+              onValueChange={(itemValue, itemIndex) => {
+                handlePress(itemValue);
+                setSelected(itemValue);
+              }}
+              itemStyle={{color: isDarkMode ? Colors.white:Colors.black}}
+            >
+              {history.map(item=><Picker.Item label={item.text} value={item.text} />)}
+            </Picker>
+            <View
               style={{
-                flex:3,
-                backgroundColor: isDarkMode ? Colors.darker : Colors.lighter,
-                height:'50%'
-              }}>
-                <FlatList
-                  style={{
-                    flex:3,
-                    backgroundColor: isDarkMode ? Colors.darker : Colors.lighter,
-                    height:'50%'
-                  }}
-                  data={history}
-                  renderItem={renderItem}
-                  keyExtractor={item => item.id.toString()}
-                />
-            </ScrollView>
-            <Text style={{
-              textAlign: 'center',
-              fontSize: 30,
-              color: isDarkMode ? Colors.white:Colors.black
-            }}>音声に変換します</Text>
-            <TextInput
-            style={{
-              backgroundColor: Colors.white,
-              width: '100%',
-              height: '50%'
-            }}
-            onChangeText={onChangeText}
-            value={text}
-            placeholder="Type here..."
-            onKeyPress={handleKeyPress}
-            multiline
-            ></TextInput>
+                flex: 1,
+                justifyContent: 'center',
+                alignItems: 'center'
+              }}
+            >
+              <View style={{flexDirection: 'row', justifyContent:'center'}}>
+                <Text style={{
+                  textAlign: 'center',
+                  fontSize: 30,
+                  color: isDarkMode ? Colors.white:Colors.black
+                }}>音声に変換します
+                </Text>
+                <Item name={play} size={40} onPress={handleTTS} style={{marginBottom: 10, marginLeft: 5}}/>
+              </View>
+              <TextInput
+              style={{
+                backgroundColor: Colors.white,
+                width: '90%',
+                height: '100%',
+                margin: 5,
+                borderRadius: 10,
+                padding: 10
+              }}
+              onChangeText={onChangeText}
+              value={text}
+              placeholder="Type here..."
+              onKeyPress={handleKeyPress}
+              multiline
+              />
+            </View>
         </View>
       </ScrollView>
     </SafeAreaView>
